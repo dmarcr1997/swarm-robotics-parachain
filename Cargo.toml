@@ -8,7 +8,7 @@ edition = "2021"
 [workspace]
 default-members = ["pallets/template", "runtime"]
 members = [
-    "node",
+    "node", "pallets/swarm-robot-pallet",
     "pallets/template",
     "runtime",
 ]
@@ -34,6 +34,9 @@ serde_json = { version = "1.0.132", default-features = false }
 smallvec = { version = "1.11.0", default-features = false }
 substrate-wasm-builder = { version = "26.0.1", default-features = false }
 frame = { version = "0.9.1", default-features = false, package = "polkadot-sdk-frame" }
+sp-core = { version = "36.1.0", default-features = false }
+sp-runtime = { version = "41.1.0", default-features = false }
+sp-std = { version = "11.0.0", default-features = false }
 
 [profile.release]
 opt-level = 3
