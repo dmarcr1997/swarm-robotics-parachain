@@ -22,7 +22,8 @@
 // OTHER DEALINGS IN THE SOFTWARE.
 //
 // For more information, please refer to <http://unlicense.org>
-
+use super::OriginCaller;
+use swarm_robot_pallet::Coordinate;
 mod xcm_config;
 
 use polkadot_sdk::{staging_parachain_info as parachain_info, staging_xcm as xcm, *};
@@ -320,4 +321,17 @@ impl pallet_collator_selection::Config for Runtime {
 impl pallet_parachain_template::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_parachain_template::weights::SubstrateWeight<Runtime>;
+}
+
+parameter_types! {
+    pub const MaxGlobalCommands: u32 = 64;
+}
+
+impl swarm_robot_pallet::Config for Runtime {
+    type RuntimeEvent      = RuntimeEvent;
+    type RuntimeCall       = RuntimeCall;
+    type Location          = Coordinate;
+    type RobotId           = u32;
+    type TaskDefinition    = u32;
+    type MaxGlobalCommands = MaxGlobalCommands;
 }

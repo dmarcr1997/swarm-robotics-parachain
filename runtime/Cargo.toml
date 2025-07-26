@@ -27,6 +27,7 @@ polkadot-sdk = { workspace = true, features = ["cumulus-pallet-aura-ext", "cumul
 scale-info = { features = ["derive"], workspace = true }
 serde_json = { workspace = true, default-features = false, features = ["alloc"] }
 smallvec = { workspace = true, default-features = true }
+swarm-robot-pallet = { path = "../pallets/swarm-robot-pallet", default-features = false }
 
 [features]
 default = ["std"]
@@ -39,6 +40,7 @@ std = [
 	"scale-info/std",
 	"serde_json/std",
 	"substrate-wasm-builder",
+	"swarm-robot-pallet/std",
 ]
 
 runtime-benchmarks = [

@@ -2,155 +2,160 @@
 
 pub use pallet::*;
 
-#[frame::pallet] 
-pub mod pallet { 
-    use super::*; 
+#[frame::pallet]
+pub mod pallet {
+    use super::*;
+    use core::fmt::Debug;
     use frame::{pallet, prelude::*};
+    use frame::deps::codec::{Decode, Encode, MaxEncodedLen};
     use frame::deps::scale_info::TypeInfo;
-    use frame::deps::codec::{Encode, Decode, MaxEncodedLen};
     use frame::deps::sp_runtime::RuntimeDebug;
-    use sp_std::vec::Vec; // For `Vec` as part of custom struct definitions
-    use sp_core::bounded::BoundedVec; // For BoundedVec in storage values
-            
-    #[pallet::pallet] 
-    pub struct Pallet < T > ( _ ); 
+    use sp_core::bounded::BoundedVec;
 
-    
+    #[pallet::pallet]
+    pub struct Pallet<T>(_);
+
+    #[derive(
+        Encode, Decode, DecodeWithMemTracking, Clone, Copy,
+        PartialEq, Eq, MaxEncodedLen, TypeInfo, RuntimeDebug, Default,
+    )]
+    pub struct Coordinate {
+        pub x: u32,
+        pub y: u32,
+    }    
+
+
     //=====Pallet Configuration=====
-    
-    #[pallet::config] 
-    pub trait Config : frame_system :: Config { 
-        type RuntimeEvent : From < Event < Self >> + IsType << Self as frame_system :: Config > :: RuntimeEvent >;
 
-        type RuntimeCall: IsType<<Self as frame_system::Config>::RuntimeCall> + From<Call<Self>>; 
+    #[pallet::config]
+    pub trait Config: frame_system::Config + Debug {
+        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
-        type LocationId: Parameter + Member + Default + Copy + Hash + MaxEncodedLen + TypeInfo + PartialEq + Eq;
+        type RuntimeCall: IsType<<Self as frame_system::Config>::RuntimeCall> + From<Call<Self>>;
 
-        type RobotId: Parameter + Member + Default + Copy + Hash + MaxEncodedLen + TypeInfo + PartialEq + Eq;
+        type Location: Parameter
+            + Member
+            + Default
+            + Copy
+            + Encode
+            + Decode
+            + MaxEncodedLen
+            + TypeInfo
+            + PartialEq
+            + Eq;
+
+        type RobotId: Parameter
+            + Member
+            + Default
+            + Copy
+            + MaxEncodedLen
+            + TypeInfo
+            + PartialEq
+            + Eq;
+
+        type TaskDefinition: Parameter
+            + Member
+            + MaxEncodedLen
+            + TypeInfo
+            + PartialEq
+            + Eq;
 
         #[pallet::constant]
-        type MaxSwarmSize: Get<u32>;
-
-        #[pallet::constant]
-        type MaxLocations: Get<u32>;
-        type TaskDefinition: Parameter + Member + MaxEncodedLen + TypeInfo + PartialEq + Eq;
-
-        #[pallet::constant]
-        type MaxCommandWaitBlocks: Get<BlockNumberFor<Self>>;
-
-        #[pallet::constant]
-        type MaxCommandsPerRobot: Get<u32>;
-
-        #[pallet::constant]
-        type MaxTasksPerLocation: Get<u32> + TypeInfo;
-
+        type MaxGlobalCommands: Get<u32>;
     }
 
-    //=====Custom Types and Enums=====
-    #[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, TypeInfo, RuntimeDebug)]
-    pub enum RobotStatus<LocationId, TaskDefinition> {
-        Idle,
-        Moving { target_location: LocationId },
-        PerformingTask { task: TaskDefinition },
-        WaitingForCommand,
-        Error,
-    }
-
-    #[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, TypeInfo, RuntimeDebug)]
-    #[scale_info(skip_type_params(LocationId, TaskDefinition))]
-    pub struct RobotState<LocationId, TaskDefinition> {
-        pub current_location: Option<LocationId>,
-        pub status: RobotStatus<LocationId, TaskDefinition>,
-    }
-
-    #[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, TypeInfo, RuntimeDebug)]
-    #[scale_info(skip_type_params(TaskDefinition, MaxTasksPerLocation))]
-    pub struct LocationInfo<TaskDefinition, MaxTasksPerLocation: Get<u32>> {
-        pub status: LocationStatus,
-        pub tasks_available: BoundedVec<TaskDefinition, MaxTasksPerLocation>,
-    }
-
-    #[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, TypeInfo, RuntimeDebug)]
-    pub enum LocationStatus {
-        Occupied { robot_id: u32 },
-        Available,
-        UnderMaintenance,
-    }
-
-    #[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, TypeInfo, RuntimeDebug)]
-    pub enum Command<LocationId, TaskDefinition> {
-        GoToLocation(LocationId),
-        PerformTask(TaskDefinition),
+    #[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+    #[scale_info(skip_type_params(T))]
+    pub enum Command<T: Config> {
+        GoToLocation(T::Location),
+        PerformTask(T::TaskDefinition),
         Halt,
         WaitForCommand,
     }
 
     //=====Pallet Storage=====
-    #[pallet::storage]
-    #[pallet::getter(fn robots_state)]
-    pub type RobotStates<T: Config> = StorageMap<_, Blake2_128Concat, T::RobotId, RobotState<T::LocationId, T::TaskDefinition>>;
 
     #[pallet::storage]
-    #[pallet::getter(fn locations_data)]
-    pub type LocationData<T: Config> =
-    StorageMap<_, Blake2_128Concat, T::LocationId, LocationInfo<T::TaskDefinition, T::MaxTasksPerLocation>>;
+    #[pallet::getter(fn registered_robots)]
+    pub type RegisteredRobots<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::RobotId, (), ValueQuery>;
 
     #[pallet::storage]
-    #[pallet::getter(fn command_queue)]
-    pub type CommandQueue<T: Config> = StorageMap<_, Blake2_128Concat, T::RobotId, BoundedVec<Command<T::LocationId, T::TaskDefinition>, T::MaxCommandsPerRobot>>;
-
-    #[pallet::storage]
-    #[pallet::getter(fn total_active_robots)]
-    pub type TotalActiveRobots<T> = StorageValue<_, u32, ValueQuery>;
+    #[pallet::getter(fn global_command_queue)]
+    pub type GlobalCommandQueue<T: Config> = StorageValue<
+        _,
+        BoundedVec<Command<T>, T::MaxGlobalCommands>, // 3) Command<T> here
+        ValueQuery,
+    >;
 
     //=====Pallet Errors=====
     #[pallet::error]
     #[derive(PartialEq, Clone)]
     pub enum Error<T> {
-        ExecutionFailed,
         InvalidRobotId,
-        InvalidLocationId,
-        TaskNotAvailable
+        QueueFull,
+        QueueEmpty,
     }
-
 
     //=====Pallet Events=====
     #[pallet::event]
-    #[pallet::generate_deposit(pub (super) fn deposit_event)]
+    #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
-        RobotMoved {
-            robot_id: T::RobotId,
-            from_location: T::LocationId,
-            to_location: T::LocationId,
+        CommandEnqueued(Command<T>),
+        CommandPulled {
+            robot_id:  T::RobotId,
+            command:   Command<T>,
+            coordinate: Option<T::Location>,
         },
-        RobotTaskStarted {
-            robot_id: T::RobotId,
-            location_id: T::LocationId,
-            task: T::TaskDefinition,
-        },
-        RobotTaskCompleted {
-            robot_id: T::RobotId,
-            location_id: T::LocationId,
-            task: T::TaskDefinition,
-            success: bool,
-        },
-        CommandIssued {
-            robot_id: Option<T::RobotId>,
-            command: Command<T::LocationId, T::TaskDefinition>,
-            commander: T::AccountId,
-        },
-        RobotStatusUpdated {
-            robot_id: T::RobotId,
-            new_status: RobotStatus<T::LocationId, T::TaskDefinition>,
-        },
-        RobotWaitingForCommand {
-            robot_id: T::RobotId,
-            location_id: T::LocationId,
-        },
-        RobotError {
-            robot_id: T::RobotId,
-            error_details: Error<T>,
-        }
     }
 
+    #[pallet::call]
+    impl<T: Config> Pallet<T> {
+        #[pallet::weight(10_000)]
+        pub fn register_robot(origin: OriginFor<T>, robot_id: T::RobotId) -> DispatchResult {
+            let _who = ensure_signed(origin)?;
+            RegisteredRobots::<T>::insert(&robot_id, ());
+            Ok(())
+        }
+
+        #[pallet::weight(10_000)]
+        pub fn enqueue_command(
+            origin: OriginFor<T>,
+            command: Command<T>,
+        ) -> DispatchResult {
+            let _who = ensure_signed(origin)?;
+            let mut queue = GlobalCommandQueue::<T>::get();
+            queue.try_push(command.clone()).map_err(|_| Error::<T>::QueueFull)?;
+            GlobalCommandQueue::<T>::put(queue);
+            Self::deposit_event(Event::CommandEnqueued(command));
+            Ok(())
+        }
+
+        #[pallet::weight(10_000)]
+        pub fn pull_next(origin: OriginFor<T>, robot_id: T::RobotId) -> DispatchResult {
+            let _who = ensure_signed(origin)?;
+            ensure!(
+                RegisteredRobots::<T>::contains_key(&robot_id),
+                Error::<T>::InvalidRobotId
+            );
+
+            let mut queue = GlobalCommandQueue::<T>::get();
+            let cmd = queue.get(0).cloned().ok_or(Error::<T>::QueueEmpty)?;
+            queue.remove(0);
+            GlobalCommandQueue::<T>::put(queue);
+
+            let coord = if let Command::GoToLocation(c) = &cmd {
+                Some(*c)
+            } else {
+                None
+            };
+
+            Self::deposit_event(Event::CommandPulled {
+                robot_id,
+                command: cmd,
+                coordinate: coord,
+            });
+            Ok(())
+        }
+    }
 }

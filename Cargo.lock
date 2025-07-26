@@ -10021,6 +10021,7 @@ dependencies = [
  "serde_json",
  "smallvec",
  "substrate-wasm-builder",
+ "swarm-robot-pallet",
 ]
 
 [[package]]
