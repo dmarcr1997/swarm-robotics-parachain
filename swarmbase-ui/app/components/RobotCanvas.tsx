@@ -1,16 +1,25 @@
+"use client";
 import { useEffect, useRef } from "react";
 import { Application, Graphics } from "pixi.js";
 
-export default function RobotCanvas({ robots }) {
+export default function RobotCanvas({ robots, onClick }) {
   const containerRef = useRef(null);
   const appRef = useRef(null);
   const spritesRef = useRef({});
   const tweensRef = useRef({});
 
+  const onClickRef = useRef(onClick);
+  useEffect(() => {
+    onClickRef.current = onClick;
+  }, [onClick]);
+
   useEffect(() => {
     if (!containerRef.current) return;
     const app = new Application();
     appRef.current = app;
+
+    let canvasEl;
+    let handleClick;
 
     const tick = () => {
       const now = appRef.current.ticker.lastTime;
@@ -29,12 +38,25 @@ export default function RobotCanvas({ robots }) {
     };
 
     (async () => {
-      await app.init({ width: 800, height: 600, backgroundColor: 0x1099bb });
-      containerRef.current.appendChild(app.canvas);
+      await app.init({ width: 800, height: 600, backgroundColor: 0x1a001f });
+      canvasEl = app.canvas;
+      canvasEl.classList.add("pixi-canvas");
+      canvasEl.style.cursor = "crosshair";
+      handleClick = (e) => {
+        const rect = canvasEl.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * app.renderer.width;
+        const y = ((e.clientY - rect.top) / rect.height) * app.renderer.height;
+        onClickRef.current?.(Math.round(x), Math.round(y));
+      };
+      canvasEl.addEventListener("click", handleClick);
+      containerRef.current.appendChild(canvasEl);
       app.ticker.add(tick);
     })();
 
     return () => {
+      if (canvasEl && handleClick) {
+        canvasEl.removeEventListener("click", handleClick);
+      }
       app.destroy(true, { children: true });
     };
   }, []);

@@ -3,14 +3,14 @@ import { useEffect, useRef, useState } from "react";
 import { initPolkadot, listenToCommandEvents } from "./lib/polkadot";
 
 import RobotCanvas from "./components/RobotCanvas";
+import CommandLog from "./components/CommandLog";
 
 export default function Home() {
   const [api, setApi] = useState(null);
   const [signer, setSigner] = useState(null);
   const [robots, setRobots] = useState([]);
-  const [xValue, setXValue] = useState(0);
-  const [yValue, setYValue] = useState(0);
-  const [queue, setQueue] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [events, setEvents] = useState([]);
 
   const onMoveCommand = ([, centerXRaw, centerYRaw]) => {
     const centerX = Number(centerXRaw);
@@ -32,6 +32,10 @@ export default function Home() {
     });
   };
 
+  const updateEvents = (newEvent: string) => {
+    setEvents((previousEvents) => [...previousEvents, newEvent]);
+  };
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -39,6 +43,7 @@ export default function Home() {
       if (!alive) return;
       setApi(api);
       setSigner(devPair);
+      updateEvents("Connected to Swarm Parachain...");
     })();
     return () => {
       alive = false;
@@ -62,10 +67,9 @@ export default function Home() {
             const newX = Number(x);
             const newY = Number(y);
 
-            console.log(`Moving robot #${idNum} to`, newX, newY);
+            updateEvents(`Moving robot #${idNum} to ${newX},${newY}`);
 
             onMoveCommand([idNum, newX, newY]);
-            setQueue((q) => [...q, { id: idNum, cmd: coords }]);
           }
         });
       });
@@ -81,34 +85,47 @@ export default function Home() {
       console.error("API or signer not ready");
       return;
     }
+    setLoading(true);
     const tx = api.tx.swarmRobotPallet.registerRobot(robots.length);
+    updateEvents(`Registerd Robot ${robots.length}`);
     const { nonce } = await api.rpc.system.accountNextIndex(signer.address);
     await tx.signAndSend(signer, { nonce }, ({ status, dispatchError }) => {
       if (dispatchError) {
         console.error("Register failed:", dispatchError.toString());
+        updateEvents(`Register failed: ${dispatchError.toString()}`);
+        setLoading(false);
       } else if (status.isFinalized) {
         console.log("Registered in block", status.asFinalized.toString());
+        updateEvents(`Registered in block: ${status.asFinalized.toString()}`);
+        setLoading(false);
       }
     });
     setRobots((r) => [...r, { id: r.length, position: { x: 0, y: 0 } }]);
   };
 
-  const sendMoveCommand = async () => {
+  const handleCanvasClick = async (x, y) => {
     if (!api || !signer) {
       console.error("API or signer not ready");
       return;
     }
-    const tx = api.tx.swarmRobotPallet.enqueueCommand({
-      GoToLocation: [xValue, yValue],
-    });
-    const { nonce } = await api.rpc.system.accountNextIndex(signer.address);
-    await tx.signAndSend(signer, { nonce }, ({ status, dispatchError }) => {
-      if (dispatchError) {
-        console.error("Command failed:", dispatchError.toString());
-      } else if (status.isFinalized) {
-        console.log("Move command finalized");
-      }
-    });
+    setLoading(true);
+    try {
+      await api.tx.swarmRobotPallet
+        .enqueueCommand({ GoToLocation: [x, y] })
+        .signAndSend(signer, ({ status, dispatchError }) => {
+          if (dispatchError) {
+            updateEvents(`Command failed: ${dispatchError.toString()}`);
+            console.error("Command failed:", dispatchError.toString());
+            setLoading(false);
+          } else if (status.isFinalized) {
+            console.log("Enqueued move to", x, y);
+            commandPull();
+          }
+        });
+    } catch (err) {
+      console.error("enqueue failed:", err);
+      setLoading(false);
+    }
   };
 
   const commandPull = async () => {
@@ -117,14 +134,18 @@ export default function Home() {
       console.error("No robots registered");
       return;
     }
-
+    updateEvents("Sending to robots.");
     await api.tx.swarmRobotPallet
       .pullNext(robots[0].id)
       .signAndSend(signer, ({ status, dispatchError }) => {
         if (dispatchError) {
+          updateEvents("Command Failed!!!");
+          updateEvents(dispatchError.toString());
           console.error("Pull failed:", dispatchError.toString());
+          setLoading(false);
         } else if (status.isFinalized) {
-          console.log(`Pulled command for robots`);
+          updateEvents("Finished Command");
+          setLoading(false);
         }
       });
   };
@@ -132,44 +153,28 @@ export default function Home() {
   const ready = !!api && !!signer;
 
   return (
-    <div className="container">
-      <h1>SwarmBase Command Center</h1>
-      <button
-        className="row polkadot-button"
-        onClick={registerRobot}
-        disabled={!ready}
-      >
-        Register Robot
-      </button>
-      <div className="row">
+    <div className="page-wrapper">
+      <div className="main-panel">
+        <h1>SwarmBase Command Center</h1>
         <button
-          className="polkadot-button"
-          onClick={sendMoveCommand}
+          className="row polkadot-button"
+          onClick={registerRobot}
           disabled={!ready}
         >
-          Send Move Command
+          {loading ? "Loading…" : "Register Robot"}
         </button>
-        <input
-          type="number"
-          placeholder="X Coordinate"
-          value={xValue}
-          onChange={(event) => setXValue(event.target.value)}
-        />
-        <input
-          type="number"
-          placeholder="Y Coordinate"
-          value={yValue}
-          onChange={(event) => setYValue(event.target.value)}
-        />
+        <p>
+          {loading
+            ? "Waiting for blockchain…"
+            : "Click on the canvas to send a move command to all robots."}
+        </p>
+
+        <RobotCanvas robots={robots} onClick={handleCanvasClick} />
       </div>
-      <button
-        className="row polkadot-button"
-        onClick={commandPull}
-        disabled={!ready}
-      >
-        Pull Next Command
-      </button>
-      <RobotCanvas robots={robots} />
+      <div className="log-panel">
+        <h2>Command Log</h2>
+        <CommandLog log={events} />
+      </div>
     </div>
   );
 }

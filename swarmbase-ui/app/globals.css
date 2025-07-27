@@ -3,6 +3,9 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --accent: #ff004f;
+  --accent-dark: #e6007a;
+  --border-glow: rgb(255, 0, 17);
 }
 
 @theme inline {
@@ -20,15 +23,57 @@
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  transition: background 0.3s, color 0.3s;
 }
 
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
+.page-wrapper {
+  display: flex;
+  align-items: flex-start;
+  gap: 50px;
   padding: 20px;
+  background-color: var(--background);
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 20px var(--border-glow);
+}
+
+.main-panel {
+  flex: 1;
+  max-width: 65%;
+}
+
+.log-panel {
+  width: 30%;
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+.command-log {
+  width: 100%;
+  min-height: 100px;
+  padding: 10px;
+  background: #0a0a0a;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  box-shadow: 0 0 10px rgba(255, 0, 79, 0.6);
+  font-family: monospace;
+  margin-top: 8px;
+}
+
+.command-log {
+  overflow-y: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.command-log::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  background: transparent;
 }
 
 .row {
@@ -39,10 +84,34 @@ body {
 }
 
 .polkadot-button {
-  background-color: #e6007a;
-  color: white;
+  position: relative;
+  background: transparent;
+  color: var(--accent);
   padding: 10px 20px;
+  border: 2px solid var(--accent);
   border-radius: 5px;
-  text-decoration: none;
   font-weight: bold;
+  cursor: pointer;
+  overflow: hidden;
+  transition: color 0.2s, background 0.2s;
+}
+
+.polkadot-button:hover {
+  background: var(--accent-dark);
+  color: var(--background);
+  box-shadow: 0 0 20px var(--border-glow);
+}
+
+.pixi-canvas {
+  display: block;
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  box-shadow: 0 0 10px rgba(255, 0, 79, 0.3),
+    inset 0 0 30px rgba(255, 0, 79, 0.2);
+
+  background: radial-gradient(
+    circle at center,
+    transparent 60%,
+    rgba(0, 0, 0, 0.8) 100%
+  );
 }
