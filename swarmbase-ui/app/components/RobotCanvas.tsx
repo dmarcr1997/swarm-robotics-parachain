@@ -2,7 +2,7 @@
 import { useEffect, useRef } from "react";
 import { Application, Graphics } from "pixi.js";
 
-export default function RobotCanvas({ robots, onClick }) {
+export default function RobotCanvas({ robots = [], onClick }) {
   const containerRef = useRef(null);
   const appRef = useRef(null);
   const spritesRef = useRef({});
