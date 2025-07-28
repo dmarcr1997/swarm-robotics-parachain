@@ -16,7 +16,6 @@ export default function Home() {
   const [target, setTarget] = useState<Vec | null>(null);
   const robotsRef = useRef<Robot[]>(robots);
 
-  // keep the ref in sync
   useEffect(() => {
     robotsRef.current = robots;
   }, [robots]);
@@ -29,7 +28,6 @@ export default function Home() {
     if (!target) return;
     let frame = 0;
     const timer = setInterval(() => {
-      console.log("RB", robots.length); // <-- fresh each render
       if (robotsRef.current.length === 1) directSeek(target.x, target.y);
       else if (swarmType === SwarmType.Boids) moveToBoids(target.x, target.y);
       else moveToPotentialField(target.x, target.y);
